@@ -12,3 +12,5 @@ wheels/
 # Custom
 *_data/
 *.epub
+reader3.db
+.env

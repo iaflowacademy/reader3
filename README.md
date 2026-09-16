@@ -1,27 +1,78 @@
-# reader 3
+# reader3
 
 ![reader3](reader3.png)
 
-A lightweight, self-hosted EPUB reader that lets you read through EPUB books one chapter at a time. This makes it very easy to copy paste the contents of a chapter to an LLM, to read along. Basically - get epub books (e.g. [Project Gutenberg](https://www.gutenberg.org/) has many), open them up in this reader, copy paste text around to your favorite LLM, and read together and along.
+A lightweight, self-hosted EPUB reader for reading books together with an LLM. Get an EPUB
+(e.g. from [Project Gutenberg](https://www.gutenberg.org/)), open it up here, and either
+select any passage to ask a question about it, or ask for a chapter summary — no more
+switching tabs and manually copy-pasting text into a chatbot.
 
-This project was 90% vibe coded just to illustrate how one can very easily [read books together with LLMs](https://x.com/karpathy/status/1990577951671509438). I'm not going to support it in any way, it's provided here as is for other people's inspiration and I don't intend to improve it. Code is ephemeral now and libraries are over, ask your LLM to change it in whatever way you like.
+This is a fork of [karpathy/reader3](https://github.com/karpathy/reader3), which the
+original author released as a 90%-vibe-coded illustration and explicitly said he wouldn't
+maintain. 488 forks and 24 unmerged PRs later, the most-requested feature — actually talking
+to an LLM about what you're reading — still didn't exist. This fork adds it, plus the other
+things people kept asking for: reading progress, highlights, and a copy button that doesn't
+require selecting text by hand.
+
+## What's new in this fork
+
+- **Ask AI** — select any passage and ask a question about it, or ask about the whole
+  chapter. Streamed responses via the Anthropic API.
+- **Summarize chapter** — one click, no selection needed.
+- **Highlights** — select text → Highlight. Persisted in SQLite, rendered on every visit,
+  click a highlight to remove it.
+- **Reading progress** — automatically remembers your last chapter per book; the library
+  shows a progress bar and "Continue Reading" instead of always starting at chapter 1.
+- **Copy buttons** — copy a selection or the whole chapter in one click.
+- **Keyboard navigation** — ← / → to move between chapters.
+- **Mobile-responsive** — the sidebar collapses behind a menu button below ~820px.
+- A real `LICENSE` file (the original repo only mentioned MIT in prose).
+
+Still true to the original's spirit: no auth, no multi-user, no database server — just
+SQLite and pickle files, one process, `uv run`.
 
 ## Usage
 
-The project uses [uv](https://docs.astral.sh/uv/). So for example, download [Dracula EPUB3](https://www.gutenberg.org/ebooks/345) to this directory as `dracula.epub`, then:
+The project uses [uv](https://docs.astral.sh/uv/).
 
-```bash
-uv run reader3.py dracula.epub
-```
+1. Download an EPUB (e.g. [Dracula](https://www.gutenberg.org/ebooks/345)) to this
+   directory as `dracula.epub`, then process it:
 
-This creates the directory `dracula_data`, which registers the book to your local library. We can then run the server:
+   ```bash
+   uv run reader3.py dracula.epub
+   ```
 
-```bash
-uv run server.py
-```
+   This creates `dracula_data/`, which registers the book to your local library.
 
-And visit [localhost:8123](http://localhost:8123/) to see your current Library. You can easily add more books, or delete them from your library by deleting the folder. It's not supposed to be complicated or complex.
+2. (Optional, but you want this) Set your Anthropic API key to enable the AI chat panel:
+
+   ```bash
+   cp .env.example .env
+   # then edit .env and paste your key from https://console.anthropic.com/
+   ```
+
+   Without a key, the reader still works fully as an EPUB viewer — the chat panel just
+   shows a message telling you to set one.
+
+3. Run the server:
+
+   ```bash
+   uv run server.py
+   ```
+
+   Visit [localhost:8123](http://localhost:8123/) to see your library. Add more books by
+   repeating step 1; remove one by deleting its `_data` folder.
+
+## Architecture
+
+- `reader3.py` — parses an EPUB into a `Book` object (metadata, spine, TOC, images),
+  pickled to `<name>_data/book.pkl`. Unchanged from upstream.
+- `server.py` — FastAPI app: library/reader routes, plus `/api/chat` (streaming),
+  `/api/highlights` (CRUD), and progress tracking.
+- `db.py` — SQLite persistence for reading progress and highlights. No ORM.
+- `llm.py` — thin streaming wrapper around the Anthropic API. Bring your own key.
+- `templates/` — Jinja2 + vanilla JS, no frontend framework or build step.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE). Original reader3 by Andrej Karpathy.
