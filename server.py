@@ -46,12 +46,31 @@ templates = Jinja2Templates(directory="templates")
 BOOKS_DIR = "."
 
 
+def _is_safe_path_segment(value: str) -> bool:
+    """
+    Rejects anything that could escape BOOKS_DIR: path separators, '..',
+    absolute paths, or the bare '.' / '..' segments. book_id and image_name
+    both come straight from the URL and are used to build filesystem paths,
+    so this must run before either ever touches os.path.join/os.listdir.
+    """
+    if not value or value in (".", ".."):
+        return False
+    if "/" in value or "\\" in value or ".." in value:
+        return False
+    if os.path.isabs(value):
+        return False
+    return True
+
+
 @lru_cache(maxsize=10)
 def load_book_cached(folder_name: str) -> Optional[Book]:
     """
     Loads the book from the pickle file.
     Cached so we don't re-read the disk on every click.
     """
+    if not _is_safe_path_segment(folder_name):
+        return None
+
     file_path = os.path.join(BOOKS_DIR, folder_name, "book.pkl")
     if not os.path.exists(file_path):
         return None
@@ -158,11 +177,10 @@ async def serve_image(book_id: str, image_name: str):
     The HTML contains <img src="images/pic.jpg">.
     The browser resolves this to /read/{book_id}/images/pic.jpg.
     """
-    # Security check: ensure book_id is clean
-    safe_book_id = os.path.basename(book_id)
-    safe_image_name = os.path.basename(image_name)
+    if not _is_safe_path_segment(book_id) or not _is_safe_path_segment(image_name):
+        raise HTTPException(status_code=404, detail="Image not found")
 
-    img_path = os.path.join(BOOKS_DIR, safe_book_id, "images", safe_image_name)
+    img_path = os.path.join(BOOKS_DIR, book_id, "images", image_name)
 
     if not os.path.exists(img_path):
         raise HTTPException(status_code=404, detail="Image not found")
@@ -205,8 +223,20 @@ class ChatIn(BaseModel):
     history: Optional[list] = None
 
 
+MAX_QUESTION_LEN = 4000
+MAX_HISTORY_TURNS = 20
+
+
 @app.post("/api/chat")
 async def chat(payload: ChatIn):
+    question = payload.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Empty question")
+    if len(question) > MAX_QUESTION_LEN:
+        raise HTTPException(status_code=400, detail=f"Question too long (max {MAX_QUESTION_LEN} chars)")
+    if payload.history is not None and len(payload.history) > MAX_HISTORY_TURNS:
+        raise HTTPException(status_code=400, detail=f"Too much history (max {MAX_HISTORY_TURNS} turns)")
+
     book = load_book_cached(payload.book_id)
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
@@ -221,7 +251,7 @@ async def chat(payload: ChatIn):
     def gen():
         try:
             for chunk in stream_chat(
-                question=payload.question,
+                question=question,
                 context=context,
                 title=book.metadata.title,
                 authors=", ".join(book.metadata.authors),

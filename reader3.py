@@ -83,6 +83,21 @@ def clean_html_content(soup: BeautifulSoup) -> BeautifulSoup:
     for tag in soup.find_all('input'):
         tag.decompose()
 
+    # EPUBs can come from anywhere, not just Project Gutenberg. Removing
+    # <script> alone doesn't stop JS: an event-handler attribute like
+    # onerror/onload/onclick still executes inline. Strip every 'on*'
+    # attribute, and neutralize javascript:/data: URLs in href/src, so a
+    # malicious book can't run script in the reader.
+    for tag in soup.find_all(True):
+        for attr in list(tag.attrs):
+            if attr.lower().startswith('on'):
+                del tag[attr]
+        for url_attr in ('href', 'src', 'action', 'formaction'):
+            if url_attr in tag.attrs:
+                value = str(tag[url_attr]).strip().lower()
+                if value.startswith('javascript:') or value.startswith('data:text/html'):
+                    del tag[url_attr]
+
     return soup
 
 

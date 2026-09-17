@@ -74,7 +74,8 @@ The project uses [uv](https://docs.astral.sh/uv/).
 ## Architecture
 
 - `reader3.py` — parses an EPUB into a `Book` object (metadata, spine, TOC, images),
-  pickled to `<name>_data/book.pkl`. Unchanged from upstream.
+  pickled to `<name>_data/book.pkl`. Unchanged from upstream except for the sanitizer
+  hardening below.
 - `server.py` — FastAPI app: library/reader routes, plus `/api/chat` (streaming),
   `/api/highlights` (CRUD), and progress tracking.
 - `db.py` — SQLite persistence for reading progress and highlights. No ORM.
@@ -82,6 +83,34 @@ The project uses [uv](https://docs.astral.sh/uv/).
   Studio, and OpenAI via their shared OpenAI-compatible `/v1/chat/completions` endpoint
   (plain `httpx`, no extra SDK). Picked with `READER3_PROVIDER`.
 - `templates/` — Jinja2 + vanilla JS, no frontend framework or build step.
+
+## Security
+
+This is built for **one person, on their own machine**. The server binds to
+`127.0.0.1` only and there's no auth — anyone who can reach it can read every book,
+write highlights, and burn your LLM API quota. **Don't put this behind a reverse proxy
+or bind it to `0.0.0.0` without adding your own authentication first.**
+
+Before publishing this fork, I audited it and fixed two real issues found by testing,
+not just reading the code:
+
+- **Path traversal → arbitrary pickle load.** `book_id` from the URL went straight into
+  a filesystem path with no sanitization; `..` escaped `BOOKS_DIR` and unpickled a file
+  planted outside it. Confirmed by actually doing it, then fixed with a strict path-segment
+  guard in `server.py` used by every route that touches the filesystem (reader, chat, and
+  image serving). Since book folders are loaded via Python's `pickle` module, treat
+  `BOOKS_DIR` as a trust boundary: don't point it at a folder containing `_data` directories
+  you didn't create yourself with `reader3.py`.
+- **Stored XSS via a malicious EPUB.** The original sanitizer removed `<script>` tags but
+  left `onerror`/`onclick`/etc. attributes and `javascript:` URLs intact — a crafted EPUB
+  (not just ones from Project Gutenberg) could run script in the reader. Fixed by stripping
+  event-handler attributes and dangerous URL schemes during EPUB processing. Verified with
+  a battery of payloads (`onerror`, `onclick`, `javascript:`, `data:text/html`, nested
+  `<script>`) — all neutralized, normal links and images unaffected.
+
+Also checked and confirmed safe: SQL injection (all queries parameterized), highlight-text
+XSS (HTML-escaped on render), and request validation (oversized/malformed/out-of-range
+input on every endpoint returns a clean 4xx, not a crash).
 
 ## License
 
