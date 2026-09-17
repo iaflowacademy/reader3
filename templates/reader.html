@@ -54,6 +54,7 @@
         .chat-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid #eee; font-weight: 600; color: #333; }
         .chat-close { background: none; border: none; font-size: 1.2em; cursor: pointer; color: #888; }
         .chat-context { font-size: .78em; color: #888; padding: 10px 16px; border-bottom: 1px solid #f2f2f2; background: #fafafa; max-height: 4.5em; overflow-y: auto; }
+        .chat-disclaimer { font-size: .7em; color: #aaa; padding: 6px 16px; line-height: 1.4; }
         .chat-messages { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
         .msg { font-size: .92em; line-height: 1.5; padding: 9px 12px; border-radius: 10px; max-width: 90%; white-space: pre-wrap; }
         .msg.user { align-self: flex-end; background: #3498db; color: #fff; border-bottom-right-radius: 3px; }
@@ -149,6 +150,7 @@
             <button class="chat-close" onclick="closeChat()">×</button>
         </div>
         <div class="chat-context" id="chat-context">Discussing: this chapter</div>
+        <div class="chat-disclaimer">Grounded in this book's own text — which, like any file from the internet, could be wrong or crafted to mislead. Treat answers as a reading aid, not authoritative.</div>
         <div class="chat-messages" id="chat-messages"></div>
         <div class="chat-input-row">
             <textarea id="chat-input" placeholder="Ask a question…" onkeydown="handleChatKeydown(event)"></textarea>
