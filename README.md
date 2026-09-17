@@ -44,15 +44,23 @@ The project uses [uv](https://docs.astral.sh/uv/).
 
    This creates `dracula_data/`, which registers the book to your local library.
 
-2. (Optional, but you want this) Set your Anthropic API key to enable the AI chat panel:
+2. (Optional, but you want this) Enable the AI chat panel by picking a backend:
 
    ```bash
    cp .env.example .env
-   # then edit .env and paste your key from https://console.anthropic.com/
    ```
 
-   Without a key, the reader still works fully as an EPUB viewer — the chat panel just
-   shows a message telling you to set one.
+   Then edit `.env` — pick **one**:
+
+   | `READER3_PROVIDER` | Where it runs | Cost | Setup |
+   |---|---|---|---|
+   | `anthropic` (default) | Claude, cloud | paid | `ANTHROPIC_API_KEY=` from [console.anthropic.com](https://console.anthropic.com/) |
+   | `ollama` | your machine | free | `ollama pull llama3.2 && ollama serve`, then `READER3_MODEL=llama3.2` |
+   | `lmstudio` | your machine | free | load a model in LM Studio, start its local server, set `READER3_MODEL` to the name it shows |
+   | `openai` | cloud | paid | `READER3_API_KEY=` + `READER3_MODEL=gpt-4o-mini` (or any OpenAI-compatible host via `READER3_BASE_URL`) |
+
+   No key, no local server running? The reader still works fully as an EPUB viewer — the
+   chat panel just shows a message telling you what to fix.
 
 3. Run the server:
 
@@ -70,7 +78,9 @@ The project uses [uv](https://docs.astral.sh/uv/).
 - `server.py` — FastAPI app: library/reader routes, plus `/api/chat` (streaming),
   `/api/highlights` (CRUD), and progress tracking.
 - `db.py` — SQLite persistence for reading progress and highlights. No ORM.
-- `llm.py` — thin streaming wrapper around the Anthropic API. Bring your own key.
+- `llm.py` — streaming client for the chat panel. Anthropic via its SDK; Ollama, LM
+  Studio, and OpenAI via their shared OpenAI-compatible `/v1/chat/completions` endpoint
+  (plain `httpx`, no extra SDK). Picked with `READER3_PROVIDER`.
 - `templates/` — Jinja2 + vanilla JS, no frontend framework or build step.
 
 ## License
